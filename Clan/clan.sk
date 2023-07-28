@@ -3,6 +3,8 @@ options:
     C: 15
 
 #AVG Parse Time = 140ms
+#NOTE: I USED %player% TO AVOID ANY BUGS FOR FELLOW BEDROCK PLAYERS!
+#IF YOU DO NOT SUPPORT BEDROCK PLAYERS CONVERT %player% to %player's uuid%
 
 command /clan [<text>] [<text>] [<text>] [<text>]:
 	trigger:
