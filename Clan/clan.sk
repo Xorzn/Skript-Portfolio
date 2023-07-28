@@ -239,9 +239,8 @@ function clanNumber():
 		wait 2 ticks
 
 function clanHelp(p:player):
-	send "&7>&c /faction arguments" to {_p}
+	send "&7>&c /clan arguments" to {_p}
 	send "&7>&c (required)&7, &c[optional]" to {_p}
-	send "&cMember/Factionless Commands &7Basic Commands That Members Or Factionless Players Can Have " to {_p}
 	send "" to {_p}
 	send "&7>&f help [page] &7&O- Create your faction." to {_p}
 	send "&7>&f create (name) &7&O- Create your faction." to {_p}
