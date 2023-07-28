@@ -1,1 +1,503 @@
+options:
+    P: &c&l[Clan] 
+    C: 15
+
+#AVG Parse Time = 140ms
+
+command /clan [<text>] [<text>] [<text>] [<text>]:
+	trigger:
+		if arg-1 is "create":
+			if arg-2 is set:
+				clanCreate(player,arg-2)
+			else:
+				send "&c/clan create <name>"
+		else if arg-1 is "delete":
+			clanDelete(player)
+		else if arg-1 is "invite":
+			if arg-2 is set:
+				set {_invite} to arg-2 parsed as player
+				clanInvite(player,{_invite})
+			else:
+				send "&c/clan invite <player>"
+		else if arg-1 is "accept" or "join":
+			if arg-2 is set:
+				clanAccept(player,arg-2)
+			else:
+				send "&c/clan accept <clan>"
+		else if arg-1 is "deny":
+			clanDeny(player)
+		else if arg-1 is "bank":
+			set {_n} to arg-3 parsed as integer
+			if {clan::%player%} is set:
+				if arg-2 is "withdraw":
+					clanBank(player,"withdraw",{_n})
+				else if arg-2 is "deposit":
+					clanBank(player,"deposit",{_n})
+				else:
+					clanBankHelp(player)
+			else:
+				send "&cCreate a clan first!"
+		else if arg-1 is "open":
+			clanOpen(player)
+		else if arg-1 is "chat":
+			clanChat(player)
+		else if arg-1 is "list":
+			clanListPages(player,1)
+		else if arg-1 is "info":
+			if arg-2 is set:
+				clanInfoPages(player,arg-2,1)
+			else:
+				send "&c/clan info <clan>"
+		else if arg-1 is "setowner":
+			if arg-2 is set:
+				set {_p2} to arg-2 parsed as player
+				clansetOwner(player,{_p2})
+			else:
+				send "&c/clan setowner <player>"
+		else if arg-1 is "promote":
+			if arg-2 is set:
+				set {_p2} to arg-2 parsed as player
+				clanPromote(player,{_p2})
+			else:
+				send "&c/clan promote <player>"
+		else if arg-1 is "demote":
+			if arg-2 is set:
+				set {_p2} to arg-2 parsed as player
+				clanDemote(player,{_p2})
+			else:
+				send "&c/clan demote <player>"
+		else if arg-1 is "kick":
+			if arg-2 is set:
+				set {_p2} to arg-2 parsed as player
+				clanKick(player,{_p2})
+			else:
+				send "&c/clan kick <player>"
+		else if arg-1 is "leave":
+			clanLeave(player)
+		else:
+			clanHelp(player)
+
+on inventory click:
+	if (metadata "clan_info" of player) = event-inventory:
+		set {_clan} to metadata "clan_page" of player
+		cancel event
+		set {_split::*} to name of event-inventory split at "&c%{_clan}% &8&l| &9Page "
+		set {_page} to uncolored {_split::2} parsed as a number
+		if event-slot = 48:
+			clanInfoPages(player,{_clan},({_page} - 1))
+		if event-slot = 50:
+			clanInfoPages(player,{_clan},({_page} + 1))
+
+on inventory click:
+	if (metadata "clan_list" of player) = event-inventory:
+		cancel event
+		set {_split::*} to name of event-inventory split at "&cClan List &8&l| &9Page "
+		set {_page} to uncolored {_split::2} parsed as a number
+		if event-slot = 48:
+			clanListPages(player,({_page} - 1))
+		if event-slot = 50:
+			clanListPages(player,({_page} + 1))
+
+on chat:
+	if (metadata "clan_chat" of player) is set:
+		cancel event
+		loop {clan::all::%{clan::%player%}%::*}:
+			send "&c(CC)%clanChatRank(player)%%player%: &7%message%" to loop-value
+			
+	
+
+on death of a player:
+	if {clan::%attacker%} is set:
+		if victim is wearing any armor:
+			if cooldownCheck(attacker, "clan") = true:
+				send "{@P} &cSTR Gain Frozen, Please Wait Awhile To Gain STR Again." to attacker
+			else:
+				add 4 to {clan::power::%{clan::%attacker%}%}
+				send "{@P} &c+4 Faction Power" to attacker
+				cooldownAdd(attacker, {@C}, "clan")
+			if {clan::power::%{clan::%victim%}%} >= 4:
+				subtract 4 from {clan::power::%{clan::%victim%}%}
+				send "{@P} &c-4 Faction Power" to victim
+
+#Variables:
+#{clan::leader::%{_clan}%}
+#{clan::limit::%{_clan}%}
+#{clan::elder::%{_clan}%::*}
+#{clan::members::%{_clan}%::*}
+#{clan::open::%{_clan}%}
+#{clan::all::%{_clan}%::*}
+#{clan::top::%{_clan}%}
+
+function clanPromote(p:player,p2:player):
+	set {_clan} to {clan::%{_p}%}
+	if {clan::%{_p}%} is set:
+		if {clan::leader::%{_clan}%} = {_p}:
+			if {clan::members::%{_clan}%::*} contains {_p2}:
+				remove {_p2} from {clan::members::%{_clan}%::*}
+				add {_p2} to {clan::elder::%{_clan}%::*}
+				send "{@P} &aSuccessfully Promoted &e%{_p2}% &ato Elder." to {_p}
+				send "{@P} &aYou were promoted to Elder by &e%{_p}%." to {_p2}
+			else:
+				send "{@P} &e%{_p2}% &cis either not a Member or is already a Elder" to {_p}
+		else:
+			send "{@P} &cOnly the Leader can promote members!" to {_p}
+	else:
+		send "{@P} &cCreate a clan first." to {_p}
+
+function clanDemote(p:player,p2:player):
+	set {_clan} to {clan::%{_p}%}
+	if {clan::%{_p}%} is set:
+		if {clan::leader::%{_clan}%} = {_p}:
+			if {clan::elder::%{_clan}%::*} contains {_p2}:
+				add {_p2} to {clan::members::%{_clan}%::*}
+				remove {_p2} from {clan::elder::%{_clan}%::*}
+				send "{@P} &aSuccessfully Demoted &e%{_p2}% &ato Member." to {_p}
+				send "{@P} &aYou were demoted to Member by &e%{_p}%." to {_p2}
+			else:
+				send "{@P} &e%{_p2}% &cis either not a Member or is already a Member" to {_p}
+		else:
+			send "{@P} &cOnly the Leader can demote elders!" to {_p}
+	else:
+		send "{@P} &cCreate a clan first." to {_p}
+
+function clanKick(p:player,p2:player):
+	set {_clan} to {clan::%{_p}%}
+	if {clan::%{_p}%} is set:
+		if {clan::leader::%{_clan}%} = {_p}:
+			if {clan::all::%{_clan}%::*} contains {_p2}:
+				loop {clan::all::%{clan::%{_p}%}%::*}:
+					send "{@P} &e%{_p2}% &cwas kicked from the clan by %{_p}%." to loop-value
+				remove {_p2} from {clan::all::%{_clan}%::*}
+				remove {_p2} from {clan::elder::%{_clan}%::*}
+				remove {_p2} from {clan::members::%{_clan}%::*}
+				delete {clan::%{_p2}%}
+			else:
+				send "{@P} &cSeems like %{_p2}% isn't in the clan." to {_p}
+		else if {clan::elder::%{_clan}%::*} contains {_p}:
+			if {clan::leader::%{_clan}%} != {_p2}:
+				if {clan::elder::%{_clan}%::*} doesn't contain {_p2}:
+					if {clan::members::%{_clan}%::*} contains {_p2}:
+						loop {clan::all::%{clan::%{_p}%}%::*}:
+							send "{@P} &e%{_p2}% &cwas kicked from the clan by %{_p}%." to loop-value
+						remove {_p2} from {clan::all::%{_clan}%::*}
+						remove {_p2} from {clan::elder::%{_clan}%::*}
+						remove {_p2} from {clan::members::%{_clan}%::*}
+						delete {clan::%{_p2}%}
+					else:
+						send "{@P} &cSeems like %{_p2}% isn't in the clan." to {_p}
+				else:
+					send "{@P} &cYou Can't Kick Fellow Elders!" to {_p}
+			else:
+				send "{@P} &cYou Can't Kick The Leader!" to {_p}
+		else:
+			send "{@P} &cOnly The Leader and The Elders Can Kick!" to {_p}
+	else:
+		send "{@P} &cCreate a clan first!" to {_p}
+
+function clanLeave(p:player):
+	set {_clan} to {clan::%{_p}%}
+	if {clan::%{_p}%} is set:
+		if {clan::leader::%{_clan}%} != {_p}:
+			loop {clan::all::%{clan::%{_p}%}%::*}:
+				send "{@P} &e%{_p}% &cHas left the faction." to loop-value
+			remove {_p} from {clan::all::%{_clan}%::*}
+			remove {_p} from {clan::elder::%{_clan}%::*}
+			remove {_p} from {clan::members::%{_clan}%::*}
+			delete {clan::%{_p}%}
+		else:
+			send "{@P} &cYou can't leave your faction." to {_p}
+			send "{@P} &cPlease give your leadership to others before leaving!" to {_p}
+			send "{@P} &c/clan setowner <elder>" to {_p}
+	else:
+		send "{@P} &cCreate a faction first!" to {_p}
+
+function clansetOwner(p:player,p2:player):
+	set {_clan} to {clan::%{_p}%}
+	if {clan::leader::%{_clan}%} = {_p}:
+		if {clan::all::%{_clan}%::*} contains {_p}:
+			if {clan::leader::%{_clan}%} != {_p2}:
+				if {clan::elder::%{_clan}%::*} contains {_p2}:
+					set {clan::leader::%{_clan}%} to {_p2}
+					remove {_p2} from {clan::elder::%{_clan}%::*}
+					add {_p} to {clan::elder::%{_clan}%::*}
+					loop {clan::all::%{clan::%{_p}%}%::*}:
+						send "{@P} &e%{_p2}% &ais now your new leader, whom previously was &e%{_p}%" to loop-value
+				else:
+					send "{@P} &cPromote %{_p2}% first to Elder before Giving Him Leadership!" to {_p}
+			else:
+				send "{@P} &cYou're Already The Leader!" to {_p}
+		else:
+			send "{@P} &c%{_p2}% Is not within your members/elders!" to {_p}
+	else:
+		send "{@P} &cOnly the Leader can shift leadership!" to {_p}
+
+function clanNumber():
+	set {_top-clan::*} to sorted indices of {clan::power::*} in descending order
+	loop {_top-clan::*}:
+		add 1 to {_n}
+		set {clan::top::%loop-value%} to {_n}
+		wait 2 ticks
+
+function clanHelp(p:player):
+	send "&7>&c /faction arguments" to {_p}
+	send "&7>&c (required)&7, &c[optional]" to {_p}
+	send "&cMember/Factionless Commands &7Basic Commands That Members Or Factionless Players Can Have " to {_p}
+	send "" to {_p}
+	send "&7>&f help [page] &7&O- Create your faction." to {_p}
+	send "&7>&f create (name) &7&O- Create your faction." to {_p}
+	send "&7>&f info [name]&7&O- Your or another player's faction info." to {_p}
+	send "&7>&f join &7&O- Accept an invitation." to {_p}
+	send "&7>&f leave &7&O- Leave your current faction." to {_p}
+	send "&7>&f bank &7&O- Deposit & Withdraw Money" to {_p}
+	send "&7> > > > > &cPage 1 &7< < < < <" to {_p}
+
+function clanBankHelp(p:player):
+	send "&7>&c /faction arguments" to {_p}
+	send "&7>&c (required)&7, &c[optional]" to {_p}
+	send "" to {_p}
+	send "&7>&f help [page] &7&O- Create your faction." to {_p}
+	send "&7>&f create (name) &7&O- Create your faction." to {_p}
+	send "&7>&f info [name]&7&O- Your or another player's faction info." to {_p}
+	send "&7>&f join &7&O- Accept an invitation." to {_p}
+	send "&7>&f leave &7&O- Leave your current faction." to {_p}
+	send "&7>&f bank &7&O- Deposit & Withdraw Money" to {_p}
+	send "&7> > > > > &cPage 1 &7< < < < <" to {_p}
+
+every 3 minutes:
+	clanNumber()
+
+function clanCreate(p:player,n:text):
+	if {clan::%{_p}%} is not set:
+		if {_n} matches "[a-zA-Z]+":
+			if length of {_n} >= 4:
+				if length of {_n} <= 12:
+					if {clan::*} doesn't contain {_n}:
+						set {clan::%{_p}%} to {_n}
+						set {_clan} to {clan::%{_p}%}
+						set {clan::leader::%{_clan}%} to {_p}
+						set {clan::power::%{_clan}%} to 0
+						set {clan::limit::%{_clan}%} to 8
+						add {_p} to {clan::all::%{_clan}%::*}
+						set {clan::open::%{_clan}%} to false
+						broadcast "&3Clan &b%{_n}% &3has been created by &b%{_p}%"
+					else:
+						send "{@P} &cPlease pick another name, this name is already taken." to {_p}
+				else:
+					send "{@P} &cPlease Make Your Clan Name Shorter! &7(4-12 Characters)" to {_p}
+			else:
+				send "{@P} &cToo Short! Please Make It A Little Bit Longer! &7(4-12 Characters)" to {_p}
+		else:
+			send "{@P} &cOnly alphabetics are allowed." to {_p}
+	else:
+		send "{@P} &cYou already have a clan!, delete it first." to {_p}
+
+function clanChat(p:player):
+	if {clan::%{_p}%} is set:
+		if metadata "clan_chat" of {_p} is not set:
+			set metadata "clan_chat" of {_p} to true
+			send "{@P} &cClan Chat &aEnabled." to {_p}
+		else:
+			delete metadata "clan_chat" of {_p}
+			send "{@P} &cClan Chat &cDisabled." to {_p}
+	else:
+		send "{@P} &cYou're not in a clan" to {_p}
+
+function clanOpen(p:player):
+	if {clan::%{_p}%} is set:
+		if {clan::leader::%{clan::%{_p}%}%} = {_p}:
+			if {clan::open::%{clan::%{_p}%}%} = false:
+				send "{@P} &aClan is now open to the public." to {_p}
+				set {clan::open::%{clan::%{_p}%}%} to true
+			else:
+				send "{@P} &cClan is now closed to the public." to {_p}
+				set {clan::open::%{clan::%{_p}%}%} to false
+		else:
+			send "{@P} &cOnly the leader can open the clan." to {_p}
+	else:
+		send "{@P} &cCreate a clan first!" to {_p}
+
+function clanBank(p:player,m:text,i:integer):
+	if {_i} <= 0:
+		send "{@P} &cInvalid Number!" to {_p}
+		stop
+	set {_clan} to {clan::%{_p}%}
+	if {_m} = "withdraw":
+		if {clan::leader::%{_clan}%} = {_p}:
+			if {clan::bank::%{_clan}%} >= {_i}:
+				remove {_i} from {clan::bank::%{_clan}%}
+				add {_i} to {balance::%{_p}%}
+				send "{@P} &aSuccessfully Withdrawn %{_i}%$ From The Clan Bank." to {_p}
+			else:
+				send "{@P} &cNot Enough Balance In The Bank." to {_p}
+		else:
+			send "{@P} &cOnly The Leader Can Withdraw Money From The Bank." to {_p}
+	else if {_m} = "deposit":
+		if {balance::%{_p}%} >= {_i}:
+			remove {_i} from {balance::%{_p}%}
+			add {_i} to {clan::bank::%{_clan}%}
+			send "{@P} &aSuccessfully Deposited %{_i}%$ To The Clan Bank." to {_p}
+		else:
+			send "{@P} &cYou Dont have Enough Balance." to {_p}
+
+function clanDelete(p:player):
+	set {_clan} to {clan::%{_p}%}
+	if {_clan} is set:
+		if {clan::leader::%{_clan}%} = {_p}:
+			loop {clan::members::%{_clan}%::*}:
+				delete {clan::%loop-value%}
+			loop {clan::elder::%{_clan}%::*}:
+				delete {clan::%loop-value%}
+			loop {clan::all::%{_clan}%::*}:
+				delete {clan::%loop-value%}
+			delete {clan::%{_p}%}
+			delete {clan::leader::%{_clan}%}
+			delete {clan::limit::%{_clan}%}
+			delete {clan::elder::%{_clan}%::*}
+			delete {clan::power::%{_clan}%}
+			delete {clan::members::%{_clan}%::*}
+			delete {clan::open::%{_clan}%}
+			delete {clan::all::%{_clan}%::*}
+			delete {clan::bank::%{_clan}%}
+			delete {clan::top::%{_clan}%}
+			broadcast "&4Clan &c%{_clan}% &4was deleted by &c%{_p}%"
+	else:
+		send "{@P} &cCreate a clan first!" to {_p}
+    
+
+function clanInvite(p:player,p2:player):
+    if {clan::leader::%{clan::%{_p}%}%} or {clan::elder::%{clan::%{_p}%}%::*} contains {_p}:
+        if {clan::%{_p2}%} is not set:
+            if metadata "invite" of {_p2} is not set:
+                set {_clan} to {clan::%{_p}%}
+                loop {clan::all::%{_clan}%::*}:
+                    send "&e%{_p2}% &ahas been invited to join the %{_clan}% clan!" to loop-value
+                set metadata "invite" of {_p2} to {_clan}
+                send "&aYou were invited in &e%{_clan}% &aby &e%{_p}%" to {_p2}
+                send "&a/clan accept %{_clan}% - Accept Invite" to {_p2}
+                send "&c/clan deny - Deny Invite" to {_p2}
+            else:
+                send "{@P} &cAlready invited this Player!" to {_p}
+        else:
+            send "{@P} &cThis player already has a Faction!" to {_p}
+    else:
+        send "{@P} &cOnly the Leader or Elder can invite." to {_p}
+
+function clanAccept(p:player,n:text):
+    if {clan::%{_p}%} is not set:
+        if (metadata "invite" of {_p}) = {_n}:
+            set {_clan} to metadata "invite" of {_p}
+            if clanSizeCheck({_clan}) = true:
+                set {clan::%{_p}%} to {_clan}
+                loop {clan::all::%{_clan}%::*}:
+                    send "&e%{_p}% &ahas joined the %{_n}% clan!" to loop-value
+                    send "&eMake sure to greet your new clan mate!" to loop-value
+                add {_p} to {clan::members::%{_clan}%::*}
+                add {_p} to {clan::all::%{_clan}%::*}
+                delete metadata "invite" of {_p}
+            else:
+                send "{@P} &c%{_n}% Clan is already full!" to {_p}
+        else:
+            send "{@P} &c%{_n}% either doesn't exist or hasn't invited you!" to {_p}
+    else:
+        send "{@P} &cYou're already in a clan, leave first before accepting an invite." to {_p}
+
+function clanDeny(p:player):
+    if (metadata "invite" of {_p}) is set:
+        set {_clan} to metadata "invite" of {_p}
+        loop {clan::all::%{_clan}%::*}:
+            send "&c%{_p}% has rejected the invite from the clan." to loop-value
+        send "{@P} &aSuccessfully rejected %{_clan}%'s invitation to join." to {_p}
+        delete metadata "invite" of {_p}
+    else:
+        send "{@P} &cYou don't have any invites!" to {_p}
+
+function clanInfoPages(p:player,c:text,page:number):
+	if {_page} <= 0:
+		stop
+	if {clan::*} doesn't contain {_c}:
+		send "&cClan Doesn't Exist!" to {_p}
+		stop
+	close {_p}'s inventory
+	set metadata "clan_page" of {_p} to {_c}
+	set {_l} to {clan::leader::%{_c}%}
+	set {_a} to size of {clan::all::%{_c}%::*}
+	set {_at} to {clan::limit::%{_c}%}
+	set {_b} to {clan::bank::%{_c}%}
+	set {_str} to {clan::power::%{_c}%}
+	set {_menu} to metadata "clan_page" of {_p} 
+	set (metadata "clan_info" of {_p}) to chest inventory with 6 row with name "&c%{_menu}% &8&l| &9Page %{_page}%" 
+	set slot (integers between 0 and 3),(integers between 5 and 8),(integers between 45 and 47),(integers between 51 and 53),49 of (metadata "clan_info" of {_p}) to gray stained glass pane named ""
+	set slot 4 of (metadata "clan_info" of {_p}) to red standing banner named "&7▎ &eClan: &a%{_menu}%" with lore "&7▎ &eLeader: &4%{_l}%","&7▎ &ePower: &c%{_str} ? 0%","&7▎ &eBank: &a%{_b} ? 0%$","&7▎ &eTotal Members: &a%{_a} ? 0%/%{_at} ? 8%"
+	set slot 48 of (metadata "clan_info" of {_p}) to arrow named "&cPrevious Page" with lore "&7▎ &cPage %({_page} - 1)%" 
+	set slot 50 of (metadata "clan_info" of {_p}) to arrow named "&aNext Page" with lore "&7▎ &aPage %({_page} + 1)%" 
+	set {_n} to 9 
+	set {_n::*} to yaml path list "" from "config"
+	loop integers between (({_page} - 1) * 35) + 1 and (({_page} - 1) * 35) + 35:
+		set {_name} to (loop-value)th element out of {clan::all::%{_menu}%::*}
+		if {_name} is set:
+			set slot {_n} of (metadata "clan_info" of {_p}) to player head named coloured "&a%{_name}%" with lore "&7▎ &cHierarchy: %clanRankCheck({_name},{_menu})%"
+			add 1 to {_n} 
+	open (metadata "clan_info" of {_p}) to {_p}
+
+function clanListPages(p:player,page:number):
+	if {_page} <= 0:
+		stop
+	close {_p}'s inventory
+	set (metadata "clan_list" of {_p}) to chest inventory with 6 row with name "&cClan List &8&l| &9Page %{_page}%" 
+	set slot (integers between 0 and 3),(integers between 5 and 8),(integers between 45 and 47),(integers between 51 and 53),49,4 of (metadata "clan_list" of {_p}) to gray stained glass pane named ""
+	set slot 48 of (metadata "clan_list" of {_p}) to arrow named "&cPrevious Page" with lore "&7▎ &cPage %({_page} - 1)%" 
+	set slot 50 of (metadata "clan_list" of {_p}) to arrow named "&aNext Page" with lore "&7▎ &aPage %({_page} + 1)%" 
+	set {_n} to 9 
+	loop {clan::open::*}:
+		if loop-value = true:
+			set {_clan} to loop-index
+			set {_str} to {clan::power::%{_clan}%}
+			set {_clans::%{_clan}%} to {_str}
+	set {_top-clan::*} to sorted indices of {_clans::*} in descending order
+	loop integers between (({_page} - 1) * 35) + 1 and (({_page} - 1) * 35) + 35:
+		set {_name} to (loop-value)th element out of {_top-clan::*}
+		set {_top} to {clan::top::%{_name}%}
+		set {_leader} to {clan::leader::%{_name}%}
+		set {_str} to {clan::power::%{_name}%}
+		set {_bank} to {clan::bank::%{_name}%}
+		set {_count} to size of {clan::all::%{_name}%::*}
+		set {_limit} to {clan::limit::%{_name}%}
+		if {_name} is set:
+			set {_t} to "%clanTopRank({_top})%%{_top}%##" if {_top} is set else "&eUNRANKED"
+			set slot {_n} of (metadata "clan_list" of {_p}) to red standing banner named coloured "&cClan &f%{_name}%" with lore "&7▎ &eRanking: %{_t}%","&7▎ &eLeader: &4%{_leader}%","&7▎ &ePower: &c%{_str} ? 0% STR","&7▎ &eBank: &a%{_bank} ? 0%$","&7▎ &eMembers: &a%{_count} ? 0%/%{_limit} ? 8%","","&7▎ &aClick To Join This Clan"
+			add 1 to {_n} 
+	open (metadata "clan_list" of {_p}) to {_p}
+
+function clanSizeCheck(c:text) :: boolean: #true, free slot, false no slot
+    set {_clan} to size of {clan::all::%{_c}%::*}
+    if {_clan} <= {clan::limit::%{_c}%}:
+        return true
+    return false
+
+function clanRankCheck(p:object,c:object) :: text:
+	if {clan::leader::%{_c}%} contains {_p}:
+		return "&4Leader"
+	if {clan::elder::%{_c}%::*} contains {_p}:
+		return "&cElder"
+	if {clan::members::%{_c}%::*} contains {_p}:
+		return "&aMember"
+
+function clanChatRank(p:player) :: text:
+	set {_clan} to {clan::%{_p}%}
+	if {clan::leader::%{_clan}%} contains {_p}:
+		return "&4"
+	if {clan::elder::%{_clan}%::*} contains {_p}:
+		return "&c"
+	if {clan::members::%{_clan}%::*} contains {_p}:
+		return "&a"
+
+function clanTopRank(i:integer) :: text:
+	if {_i} = 1:
+		return "&c"
+	else if {_i} = 2:
+		return "&6"
+	else if {_i} = 3:
+		return "&e"
+	else:
+		return "&f"
 
